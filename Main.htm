@@ -1,0 +1,372 @@
+
+<html>
+  <head>
+    <title>Universe</title>
+    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+    <script type="text/javascript" src="Type.js"></script>
+    <script type="text/javascript" src="math.js"></script>
+    <script type="text/javascript" src="Shader.js"></script>
+    <script type="text/javascript" src="Renderer.js"></script>
+    <script type="text/javascript" src="ServiceManager.js"></script>
+    <script type="text/javascript" src="SceneObject.js"></script>
+    <script type="text/javascript" src="NavCamera.js"></script>
+    <script type="text/javascript" src="Light.js"></script>
+    <script type="text/javascript" src="Shadow.js"></script>
+    <script type="text/javascript" src="Culler.js"></script>
+    <script type="text/javascript" src="Texture.js"></script>
+    <script type="text/javascript" src="FrameBufferObject.js"></script>
+    <script type="text/javascript" src="RenderService.js"></script>
+    <script type="text/javascript" src="DeferredRenderer.js"></script>
+    <script type="text/javascript" src="Mesh.js"></script>
+    <script type="text/javascript" src="NavCamera.js"></script>
+    <script id="default-vs" type="x-shader/x-vertex">
+        attribute vec3 vPos;
+        attribute vec3 vNormal;
+
+        uniform mat4 World;
+        uniform mat4 ViewProj;
+
+        void main()
+        {
+            vec4 world_pos = World*vec4(vPos,1);
+            gl_Position = ViewProj*world_pos;
+
+        }
+
+    </script>
+    <script id="default-ps" type="x-shader/x-vertex">
+
+        void main()
+        {
+            gl_FragColor = vec4(0,0,0,1);
+        }
+        
+    </script>   
+    <script id="shadow-vs" type="x-shader/x-vertex">
+        precision highp float;
+
+        attribute vec3 vPos;
+        attribute vec3 vNormal;
+
+        uniform mat4 World;
+        uniform mat4 View;
+        uniform mat4 Proj;
+
+        varying vec4 ViewPos;
+
+        void main()
+        {
+            vec4 world_pos = World*vec4(vPos,1);
+            ViewPos = View*world_pos;
+
+            gl_Position = Proj*ViewPos;
+
+        }
+
+    </script>
+    <script id="shadow-ps" type="x-shader/x-vertex">
+        precision highp float;
+
+        varying vec4 ViewPos;
+        void main()
+        {
+            float depth = ViewPos.z/ViewPos.w;
+            gl_FragColor = vec4(depth,depth,depth,1);
+        }
+        
+    </script>   
+
+    <script id="gbuffer_pos-vs" type="x-shader/x-vertex">
+        attribute vec3 vPos;
+        attribute vec3 vNormal;
+
+        uniform mat4 World;
+        uniform mat4 ViewProj;
+
+        varying highp vec4 WorldPos;
+
+        void main()
+        {
+            WorldPos = World*vec4(vPos,1);
+
+            gl_Position = ViewProj*WorldPos;
+
+        }
+
+    </script>
+    <script id="gbuffer_pos-ps" type="x-shader/x-vertex">
+
+        varying highp vec4 WorldPos;
+
+        void main()
+        {
+            gl_FragColor = WorldPos;
+        }
+        
+    </script>        
+   <script id="gbuffer_normal-vs" type="x-shader/x-vertex">
+        attribute vec3 vPos;
+        attribute vec3 vNormal;
+
+        uniform mat4 World;
+        uniform mat4 ViewProj;
+
+        varying highp vec3 WorldNormal;
+
+        void main()
+        {
+            vec4 WorldPos = World*vec4(vPos,1);
+            WorldNormal = (World*vec4(vNormal, 0)).xyz;
+
+            gl_Position = ViewProj*WorldPos;
+
+        }
+
+    </script>
+    <script id="gbuffer_normal-ps" type="x-shader/x-vertex">
+
+        varying highp vec3 WorldNormal;
+
+        void main()
+        {
+            gl_FragColor = vec4(normalize(WorldNormal),1);
+        }
+        
+    </script>  
+ 
+   <script id="gbuffer_diffuse-vs" type="x-shader/x-vertex">
+        attribute vec3 vPos;
+        attribute vec3 vNormal;
+
+        uniform mat4 World;
+        uniform mat4 ViewProj;
+
+        void main()
+        {
+            vec4 WorldPos = World*vec4(vPos,1);
+            gl_Position = ViewProj*WorldPos;
+
+        }
+
+    </script>
+    <script id="gbuffer_diffuse-ps" type="x-shader/x-vertex">
+        precision  highp float;
+
+        uniform vec4 MaterialDiffuse;
+
+        void main()
+        {
+            gl_FragColor = MaterialDiffuse;
+        }
+        
+    </script>  
+
+    <script id="light-vs" type="x-shader/x-vertex">
+        attribute vec3 vPos;
+
+        varying highp vec2 TexCoord;
+
+        void main()
+        {
+            gl_Position = vec4(vPos*2.0,1);
+            TexCoord = (vPos.xy+0.5);
+        }
+
+    </script>
+    <script id="light-ps" type="x-shader/x-vertex">
+        precision highp float;
+
+        varying highp vec2 TexCoord;
+        uniform sampler2D PositionMap;
+        uniform sampler2D NormalMap;
+        uniform sampler2D DiffuseMap;
+
+        uniform vec3 LightDirection;
+        uniform vec4 LightProperty; // 0 : LightType 1 : LightDimmer
+        uniform vec4 LightDiffuse;
+
+        uniform mat4 LightViewMat;
+        uniform mat4 LightProjMat;
+        uniform sampler2D ShadowMap;
+
+        vec3 CalcDirectionalLight(vec4 position, vec3 normal)
+        {
+            float ndotl = max(0.0,dot(normal, LightDirection));
+
+            vec4 LightViewPosition = LightViewMat * position;
+            vec4 LightProjPosition = LightProjMat * LightViewPosition;
+
+            vec2 LightClipPos = (LightProjPosition.xy / LightProjPosition.w +1.0)/2.0;
+            float light_depth = LightViewPosition.z / LightViewPosition.w;
+
+            float LightDepthSample = texture2D(ShadowMap , LightClipPos).x;
+            float shadow = light_depth < LightDepthSample ? 1.0 : 0.0;
+
+            return ndotl*LightDiffuse.xyz*LightProperty.y * shadow;
+        }
+
+        vec3 CalcAmbientLight()
+        {
+            return LightProperty.y*LightDiffuse.xyz;
+        }
+
+        void main()
+        {
+            vec4 position = texture2D(PositionMap, TexCoord);
+            if(position.w == 0.0)
+            {
+                discard;
+            }
+            vec3 normal = normalize(texture2D(NormalMap, TexCoord).xyz);
+            
+            vec3 color = vec3(0,0,0);
+            if(LightProperty.x == 0.0)
+            {
+                color = CalcAmbientLight();
+            }
+            else if(LightProperty.x == 1.0)
+            {
+                color = CalcDirectionalLight(position, normal);
+            }
+
+            vec3 MaterialDiffuse = texture2D(DiffuseMap, TexCoord).xyz;
+
+            gl_FragColor = vec4(MaterialDiffuse*color,1);
+        }
+        
+    </script>    
+
+
+
+    <script id="pointlight-vs" type="x-shader/x-vertex">
+        attribute vec3 vPos;
+        attribute vec3 vNormal;
+
+        uniform mat4 World;
+        uniform mat4 ViewProj;
+
+        varying highp vec4 WorldPos;
+
+        void main()
+        {
+            WorldPos = World*vec4(vPos,1);
+
+            gl_Position = ViewProj*WorldPos;
+
+        }
+    </script>
+    <script id="pointlight-ps" type="x-shader/x-vertex">
+        precision highp float;
+
+        uniform sampler2D PositionMap;
+        uniform sampler2D NormalMap;
+        uniform sampler2D DiffuseMap;
+
+        uniform vec4 LightDiffuse; // xyz : diffuse w : dimmer
+        uniform vec4 LightPosition; // xyz : position w : radius
+
+        vec3 CalcPointLight(vec4 position, vec3 normal)
+        {
+            vec3 pixel_pos = position.xyz / position.w;
+            vec3 vLight = (LightPosition.xyz - pixel_pos);
+            float dist = length(vLight);
+            float intensity = clamp(1.0 - dist / LightPosition.w, 0.0, 1.0);
+            vLight = vLight / dist;
+            float ndotl = max(0.0,dot(normal, vLight));
+
+            return ndotl*LightDiffuse.xyz*LightDiffuse.w*intensity;
+        }
+        void main()
+        {
+            vec2 TexCoord = gl_FragCoord.xy/512.0;
+            vec4 position = texture2D(PositionMap, TexCoord);
+            if(position.w == 0.0)
+            {
+                discard;
+            }
+            vec3 normal = normalize(texture2D(NormalMap, TexCoord).xyz);            
+            vec3 color = CalcPointLight(position, normal);
+            vec3 MaterialDiffuse = texture2D(DiffuseMap, TexCoord).xyz;
+
+            gl_FragColor = vec4(color*MaterialDiffuse,1);
+        }
+        
+    </script>  
+
+    <script id="debug-vs" type="x-shader/x-vertex">
+        attribute vec3 vPos;
+
+        varying highp vec2 TexCoord;
+
+        void main()
+        {
+            gl_Position = vec4(vPos*2.0,1);
+            TexCoord = (vPos.xy+0.5);
+        }
+
+    </script>
+    <script id="debug-ps" type="x-shader/x-vertex">
+        precision highp float;
+
+        varying highp vec2 TexCoord;
+        uniform sampler2D DiffuseMap;
+        uniform float multiplier;
+
+        void main()
+        {
+            gl_FragColor = texture2D(DiffuseMap, TexCoord);
+            gl_FragColor.xyz *= multiplier;
+        }
+        
+    </script>    
+    <script language="javascript" type="text/javascript">
+
+        function Init() {
+            
+            ServiceManager.Init(document.getElementById("webgl-canvas"));
+
+            var render_service = new RenderService();
+            render_service.AddRenderable(new DeferredRenderer());
+
+            ServiceManager.addService(render_service);
+
+            ServiceManager.InitServices();
+        }
+
+        function Loop() {
+
+            requestAnimationFrame(Loop);
+
+            ServiceManager.update();
+        }
+
+        function main(canvas_name) {
+
+            Init(canvas_name);
+            Loop();
+        }
+
+    
+    </script>
+
+</head>
+  <body onload = "main();" oncontextmenu="return false">
+    <div id="container" style="width:620px;">
+
+        <div id="menu" align="center" style="width:100px;height:512px;float:left;background-color:#FFA500">
+
+            <input id="btn_gbuffer_position" type="button" value="POSITION"/>
+            <input id="btn_gbuffer_normal" type="button" value="NORMAL"/>
+            <input id="btn_gbuffer_diffuse" type="button" value="DIFFUSE"/>
+            <input id="btn_shadowbuffer" type="button" value="SHADOW"/>
+            <input id="btn_final" type="button" value="FINAL"/>
+
+        </div>
+        <div id="render" style="width:512px;float:right;background-color:#008800">
+            <canvas id="webgl-canvas" style="border: none;" width="512" height="512"></canvas>
+        </div>
+
+    </div>    
+
+  </body>
+</html>
