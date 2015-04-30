@@ -109,7 +109,7 @@ Mesh.prototype.CreateRendererData = function()
     {
         this.element_array_object = Renderer.gl.createBuffer();
         Renderer.gl.bindBuffer(Renderer.gl.ELEMENT_ARRAY_BUFFER, this.element_array_object);
-        Renderer.gl.bufferData(Renderer.gl.ELEMENT_ARRAY_BUFFER, this.index_data, Renderer.gl.STATIC_DRAW);
+        Renderer.gl.bufferData(Renderer.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.index_data), Renderer.gl.STATIC_DRAW);
     }
 
     this.vertex_buffer_object = Renderer.gl.createBuffer();
@@ -129,7 +129,7 @@ Mesh.prototype.Bind = function(program_id)
 
     if (this.element_array_object != -1)
     {
-        enderer.gl.bindBuffer(Renderer.gl.ELEMENT_ARRAY_BUFFER, this.element_array_object);    
+        Renderer.gl.bindBuffer( Renderer.gl.ELEMENT_ARRAY_BUFFER, this.element_array_object);    
     }
 
     var num_vertex_data_elements = this.vertex_data.vertex_data_element_cont.length;

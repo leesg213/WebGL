@@ -550,6 +550,14 @@ Matrix4.prototype.Transform = function(v)
         v.x*this.m[0*4+2]+v.y*this.m[1*4+2]+v.z*this.m[2*4+2]+v.w*this.m[3*4+2],
         v.x*this.m[0*4+3]+v.y*this.m[1*4+3]+v.z*this.m[2*4+3]+v.w*this.m[3*4+3]);
 }
+Matrix4.prototype.MakeInverse = function()
+{
+
+    var inversed = new Matrix4();
+    inversed.Set(this);
+    this.Set(inversed.Inverse());
+
+}
 Matrix4.prototype.Inverse = function()
 {
     var s0  = this.m[0*4+0] * this.m[1*4+1] - this.m[1*4+0] * this.m[0*4+1];

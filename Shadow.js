@@ -32,7 +32,7 @@ ShadowMap.prototype.Init = function()
 
 ShadowMap.prototype.UpdateRenderCamera = function(light)
 {
-	var Radius = 100;
+	var Radius = 200;
 
 	this.render_camera.SetOrtho(Radius*2, Radius*2, 10, Radius*2+10);
 

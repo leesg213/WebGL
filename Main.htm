@@ -5,6 +5,7 @@
     <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
     <script type="text/javascript" src="Type.js"></script>
     <script type="text/javascript" src="math.js"></script>
+    <script type="text/javascript" src="PerlinNoise.js"></script>
     <script type="text/javascript" src="Shader.js"></script>
     <script type="text/javascript" src="Renderer.js"></script>
     <script type="text/javascript" src="ServiceManager.js"></script>
@@ -18,6 +19,7 @@
     <script type="text/javascript" src="RenderService.js"></script>
     <script type="text/javascript" src="DeferredRenderer.js"></script>
     <script type="text/javascript" src="Mesh.js"></script>
+    <script type="text/javascript" src="Terrain.js"></script>
     <script type="text/javascript" src="NavCamera.js"></script>
     <script id="default-vs" type="x-shader/x-vertex">
         attribute vec3 vPos;
@@ -105,10 +107,12 @@
         
     </script>        
    <script id="gbuffer_normal-vs" type="x-shader/x-vertex">
+
         attribute vec3 vPos;
         attribute vec3 vNormal;
 
         uniform mat4 World;
+        uniform mat4 TrInvWorld;
         uniform mat4 ViewProj;
 
         varying highp vec3 WorldNormal;
@@ -116,7 +120,7 @@
         void main()
         {
             vec4 WorldPos = World*vec4(vPos,1);
-            WorldNormal = (World*vec4(vNormal, 0)).xyz;
+            WorldNormal = (TrInvWorld*vec4(vNormal, 0)).xyz;
 
             gl_Position = ViewProj*WorldPos;
 
@@ -351,7 +355,7 @@
 
 </head>
   <body onload = "main();" oncontextmenu="return false">
-    <div id="container" style="width:620px;">
+    <div id="container" style="width:1124px;">
 
         <div id="menu" align="center" style="width:100px;height:512px;float:left;background-color:#FFA500">
 
@@ -362,8 +366,8 @@
             <input id="btn_final" type="button" value="FINAL"/>
 
         </div>
-        <div id="render" style="width:512px;float:right;background-color:#008800">
-            <canvas id="webgl-canvas" style="border: none;" width="512" height="512"></canvas>
+        <div id="render" style="width:1024px;float:right;background-color:#008800">
+            <canvas id="webgl-canvas" style="border: none;" width="1024" height="512"></canvas>
         </div>
 
     </div>    

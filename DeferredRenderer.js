@@ -154,12 +154,6 @@ DeferredRenderer.prototype.create_scene = function()
 	box.Update();
 	this.scene.AttachChild(box);
 
-	box = new MeshObject(mesh);
-	box.Local.Scale.Set2(130,2,130);
-	box.Local.Translate.Set2(0,-10,0);
-	box.MaterialDiffuse.Set2(1,1,0);
-	box.Update();
-	this.scene.AttachChild(box);	
 
 	box = new MeshObject(mesh);
 	box.Local.Scale.Set2(30,2,30);
@@ -193,23 +187,25 @@ DeferredRenderer.prototype.create_scene = function()
 	sphere.Update();
 	this.scene.AttachChild(sphere);
 
+	mesh = Terrain.CreateMesh(30, 30, 8, 1.0 / 2.0, 4);
+	var terrain = new MeshObject(mesh);
+	terrain.Local.Scale.Set2(10,5,10);
+	terrain.Local.Translate.Set2(0,-20,0);
+	terrain.MaterialDiffuse.Set2(1,1,1);
+	terrain.Update();
+	this.scene.AttachChild(terrain);
+
 	this.sphere = new MeshObject(mesh);
 
 	var light = new DirectionalLight();
 	light.SetLookAt(new Vec3(-50,50,60), new Vec3(0,0,0), new Vec3(1,0,0));
 	light.Dimmer = 0.5;
-	light.DiffuseColor.Set2(0,0,1);
+	light.DiffuseColor.Set2(1,1,1);
 	light.EnableShadow = true;
 	this.scene.AttachChild(light);
 
-	light = new DirectionalLight();
-	light.SetLookAt(new Vec3(50,50,-30), new Vec3(0,0,0), new Vec3(0,1,0));
-	light.Dimmer = 0.2;
-	light.DiffuseColor.Set2(0,1,0);
-	light.EnableShadow = true;
-	this.scene.AttachChild(light);
 
-	var num_small_lights = 50;
+	var num_small_lights = 0;
 
 	for(var i = 0;i<num_small_lights; ++i)
 	{
@@ -273,11 +269,21 @@ DeferredRenderer.prototype.drawMeshes = function(program_id, camera, mesh_object
 
     var num_meshes = mesh_object_array.length;
 
+    var transposed_inverse_world = new Matrix4();
+
     for(var i = 0;i<num_meshes; ++i)
     {
 
 	    loc = gl.getUniformLocation(program_id, "World");
 	    gl.uniformMatrix4fv(loc,false, mesh_object_array[i].World.m);
+
+	    loc = gl.getUniformLocation(program_id, "TrInvWorld");
+
+	    transposed_inverse_world.Set(mesh_object_array[i].World);
+	    transposed_inverse_world.MakeInverse();
+	    transposed_inverse_world.MakeTranspose();
+
+	    gl.uniformMatrix4fv(loc,false, transposed_inverse_world.m);
 
 	    var material_diffuse = mesh_object_array[i].MaterialDiffuse;
 
@@ -286,8 +292,16 @@ DeferredRenderer.prototype.drawMeshes = function(program_id, camera, mesh_object
 
 	    var mesh = mesh_object_array[i].mesh;
 	    mesh.Bind(program_id);
-	    var num_elements = mesh.vertex_data.data_buffer.length/(mesh.vertex_data.stride/4);
-	    gl.drawArrays(gl.TRIANGLES, 0, num_elements);
+
+	    if(mesh.index_data == null)
+	    {
+		    var num_elements = mesh.vertex_data.data_buffer.length/(mesh.vertex_data.stride/4);
+		    gl.drawArrays(gl.TRIANGLES, 0, num_elements);
+		}
+		else
+		{
+			gl.drawElements(gl.TRIANGLES, mesh.index_data.length, gl.UNSIGNED_SHORT, null);
+		}
 	}
 }
 
